@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Validitas & Reliabilitas dengan Tabel</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+<div class="max-w-6xl mx-auto p-6 bg-white rounded-xl shadow-lg mt-6">
+  <h1 class="text-2xl font-bold mb-4 text-center">📊 Validitas & Reliabilitas + Tabel Skor</h1>
+
+  <p class="mb-2 text-sm text-gray-600">Masukkan skor setiap responden per baris, dipisahkan koma. Contoh:<br>
+    <code>4,4,4<br>5,5,4<br>3,3,3</code>
+  </p>
+
+  <textarea id="dataInput" class="w-full border rounded p-3 h-40 mb-4" placeholder="Masukkan data di sini..."></textarea>
+
+  <button onclick="hitung()" class="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700">🔍 Hitung</button>
+
+  <div id="tabelOutput" class="overflow-auto mt-6"></div>
+
+  <div class="mt-6">
+    <h2 class="text-lg font-semibold">📥 Hasil Validitas & Reliabilitas:</h2>
+    <pre id="hasilOutput" class="bg-gray-100 p-3 rounded mt-2 text-sm"></pre>
+  </div>
+</div>
+
+<script>
+function parseData(text) {
+  return text.trim().split("\n").map(row => row.split(",").map(Number));
+}
+
+function variance(arr) {
+  const mean = arr.reduce((a,b)=>a+b,0) / arr.length;
+  return arr.reduce((sum, val) => sum + (val - mean) ** 2, 0) / arr.length;
+}
+
+function pearsonCorrelation(x, y) {
+  const n = x.length;
+  const meanX = x.reduce((a,b)=>a+b,0) / n;
+  const meanY = y.reduce((a,b)=>a+b,0) / n;
+  let numerator = 0, denomX = 0, denomY = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = x[i] - meanX;
+    const dy = y[i] - meanY;
+    numerator += dx * dy;
+    denomX += dx * dx;
+    denomY += dy * dy;
+  }
+  return numerator / Math.sqrt(denomX * denomY);
+}
+
+function cronbachAlpha(data) {
+  const nItem = data[0].length;
+  const totalScores = data.map(row => row.reduce((a,b)=>a+b,0));
+  const totalVar = variance(totalScores);
+
+  let sumItemVars = 0;
+  for (let i = 0; i < nItem; i++) {
+    const scores = data.map(row => row[i]);
+    sumItemVars += variance(scores);
+  }
+
+  return (nItem / (nItem - 1)) * (1 - sumItemVars / totalVar);
+}
+
+function hitung() {
+  const data = parseData(document.getElementById("dataInput").value);
+  if (data.length === 0 || data[0].length < 2) return;
+
+  const nResponden = data.length;
+  const nItem = data[0].length;
+  const outputTable = [];
+  const sumPerColumn = Array(nItem).fill(0);
+  const sumX2 = Array(nItem).fill(0);
+  let sumTotal = 0, sumTotal2 = 0;
+
+  let html = `<table class="min-w-full text-sm text-center border border-gray-400"><thead><tr class="bg-blue-100">`;
+  html += `<th class="border px-2">No</th>`;
+  for (let i = 0; i < nItem; i++) html += `<th class="border px-2">X1.${i+1}</th>`;
+  html += `<th class="border px-2">X1total (Y)</th><th class="border px-2">Y²</th>`;
+  for (let i = 0; i < nItem; i++) html += `<th class="border px-2">(X1.${i+1})²</th>`;
+  html += `</tr></thead><tbody>`;
+
+  for (let i = 0; i < nResponden; i++) {
+    const row = data[i];
+    const total = row.reduce((a,b)=>a+b,0);
+    const total2 = total ** 2;
+    sumTotal += total;
+    sumTotal2 += total2;
+
+    html += `<tr class="hover:bg-gray-100"><td class="border">${i+1}</td>`;
+    for (let j = 0; j < nItem; j++) {
+      const val = row[j];
+      sumPerColumn[j] += val;
+      sumX2[j] += val * val;
+      html += `<td class="border">${val}</td>`;
+    }
+    html += `<td class="border">${total}</td><td class="border">${total2}</td>`;
+    for (let j = 0; j < nItem; j++) {
+      html += `<td class="border">${(row[j] * row[j])}</td>`;
+    }
+    html += `</tr>`;
+  }
+
+  html += `<tr class="font-semibold bg-yellow-100"><td class="border">∑</td>`;
+  for (let j = 0; j < nItem; j++) html += `<td class="border">${sumPerColumn[j]}</td>`;
+  html += `<td class="border">${sumTotal}</td><td class="border">${sumTotal2}</td>`;
+  for (let j = 0; j < nItem; j++) html += `<td class="border">${sumX2[j]}</td>`;
+  html += `</tr></tbody></table>`;
+
+  document.getElementById("tabelOutput").innerHTML = html;
+
+  const totalScores = data.map(row => row.reduce((a,b)=>a+b,0));
+  let hasil = "📌 Korelasi Pearson (Validitas per Item):\n";
+  for (let i = 0; i < nItem; i++) {
+    const itemScores = data.map(row => row[i]);
+    const r = pearsonCorrelation(itemScores, totalScores);
+    hasil += `Item ${i+1}: r = ${r.toFixed(3)}\n`;
+  }
+
+  const alpha = cronbachAlpha(data);
+  hasil += `\n📌 Cronbach’s Alpha (Reliabilitas):\nα = ${alpha.toFixed(3)}`;
+
+  document.getElementById("hasilOutput").textContent = hasil;
+}
+</script>
+
+</body>
+</html>
